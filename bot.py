@@ -38,19 +38,25 @@ async def request_transcript(audio_url: str) -> str:
     response.raise_for_status()
     transcript_id = response.json()["id"]
     status_url = f"{ASSEMBLYAI_TRANSCRIPT_URL}/{transcript_id}"
-    while True:
+   while True:
         status_resp = requests.get(status_url, headers=HEADERS)
         status_resp.raise_for_status()
         status = status_resp.json()
         if status["status"] == "completed":
+            return status["text"]
             utterances = status.get("utterances")
             if not utterances:
                 return status["text"]
             parts = []
             for utt in utterances:
-                speaker = utt.get("speaker", 0) + 1
+                speaker_raw = utt.get("speaker", 0)
+                try:
+                    speaker_num = int(speaker_raw) + 1
+                    label = speaker_num
+                except (TypeError, ValueError):
+                    label = speaker_raw
                 text = utt.get("text", "").strip()
-                parts.append(f"Speaker {speaker}: {text}")
+                parts.append(f"Speaker {label}: {text}")
             return "\n".join(parts)
         if status["status"] == "error":
             raise RuntimeError(f"Transcription failed: {status['error']}")
