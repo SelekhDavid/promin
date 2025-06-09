@@ -31,6 +31,7 @@ async def request_transcript(audio_url: str) -> str:
         "audio_url": audio_url,
         "speaker_labels": True,
         "language_code": "uk",
+        "speech_model": "best",
     }
     response = requests.post(ASSEMBLYAI_TRANSCRIPT_URL, json=json, headers=HEADERS)
     response.raise_for_status()
