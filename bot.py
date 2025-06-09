@@ -27,7 +27,15 @@ async def upload_audio(file_path: str) -> str:
     return response.json()["upload_url"]
 
 async def request_transcript(audio_url: str) -> str:
+
+    json = {
+        "audio_url": audio_url,
+        "speaker_labels": True,
+        "language_code": "uk",
+    }
+
     json = {"audio_url": audio_url, "speaker_labels": True}
+
     response = requests.post(ASSEMBLYAI_TRANSCRIPT_URL, json=json, headers=HEADERS)
     response.raise_for_status()
     transcript_id = response.json()["id"]
@@ -49,12 +57,23 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     elif update.message.audio:
         file = await update.message.audio.get_file()
     else:
+ 7zm8qz-codex/переглянути-базу-коду-та-запропонувати-завдання
+        await update.message.reply_text(
+            "Будь ласка, надішліть аудіоповідомлення або файл."
+
         await update.message.reply_text("Please send an audio message or file.")
+
         return
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tf:
         await file.download_to_drive(tf.name)
+
+        await update.message.reply_text(
+            "Транскрибую… це може зайняти трохи часу"
+        )
+
         await update.message.reply_text("Transcribing... this may take a moment")
+
         try:
             audio_url = await upload_audio(tf.name)
             transcript = await request_transcript(audio_url)
