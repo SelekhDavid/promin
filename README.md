@@ -1,6 +1,6 @@
 # Telegram Transcription Bot
 
-This repository contains a simple Telegram bot that receives audio messages or files, uploads them to [AssemblyAI](https://www.assemblyai.com/), and replies with the diarized transcription.
+This repository contains a simple Telegram bot that receives audio messages or files, uploads them to [AssemblyAI](https://www.assemblyai.com/), and replies with the diarized transcription. The output in Telegram clearly shows which speaker said each part of the conversation.
 
 ## Requirements
 - Python 3.9+
