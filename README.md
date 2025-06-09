@@ -1,25 +1,25 @@
-# Telegram Transcription Bot
+# Телеграм-бот транскрипції
 
-This repository contains a simple Telegram bot that receives audio messages or files, uploads them to [AssemblyAI](https://www.assemblyai.com/), and replies with the diarized transcription.
+Цей репозиторій містить простий телеграм-бот, що приймає аудіо повідомлення або файли, надсилає їх до [AssemblyAI](https://www.assemblyai.com/) і повертає розділену за мовцями транскрипцію. Мова інтерфейсу бота та транскрипцій — українська.
 
-## Requirements
+## Вимоги
 - Python 3.9+
 - `python-telegram-bot`
 - `requests`
 
-## Setup
-1. Install the required packages:
+## Налаштування
+1. Встановіть необхідні пакети:
    ```bash
    pip install python-telegram-bot requests
    ```
-2. Export your API tokens as environment variables:
+2. Експортуйте ваші токени як змінні середовища:
    ```bash
-   export TELEGRAM_TOKEN=<your_telegram_bot_token>
-   export ASSEMBLYAI_TOKEN=<your_assemblyai_token>
+   export TELEGRAM_TOKEN=<ваш_токен_бота>
+   export ASSEMBLYAI_TOKEN=<ваш_токен_assemblyai>
    ```
-3. Run the bot:
+3. Запустіть бота:
    ```bash
    python bot.py
    ```
 
-The bot uses polling, so simply run the script on your machine (macOS supported) and it will start listening for audio messages.
+Бот використовує опитування, тому достатньо запустити скрипт на вашій системі (працює на macOS) і він почне очікувати аудіо.
