@@ -27,39 +27,42 @@ async def upload_audio(file_path: str) -> str:
     return response.json()["upload_url"]
 
 async def request_transcript(audio_url: str) -> str:
-    json = {
+    payload = {
         "audio_url": audio_url,
         "speaker_labels": True,
         "language_code": "uk",
         "speech_model": "best",
         "format_text": True,
     }
-    response = requests.post(ASSEMBLYAI_TRANSCRIPT_URL, json=json, headers=HEADERS)
-    response.raise_for_status()
-    transcript_id = response.json()["id"]
+    resp = requests.post(ASSEMBLYAI_TRANSCRIPT_URL, json=payload, headers=HEADERS)
+    resp.raise_for_status()
+    transcript_id = resp.json()["id"]
     status_url = f"{ASSEMBLYAI_TRANSCRIPT_URL}/{transcript_id}"
+
     while True:
         status_resp = requests.get(status_url, headers=HEADERS)
         status_resp.raise_for_status()
-        status = status_resp.json()
-        if status["status"] == "completed":
-            return status["text"]
-            utterances = status.get("utterances")
-            if not utterances:
-                return status["text"]
-            parts = []
-            for utt in utterances:
-                speaker_raw = utt.get("speaker", 0)
-                try:
-                    speaker_num = int(speaker_raw) + 1
-                    label = speaker_num
-                except (TypeError, ValueError):
-                    label = speaker_raw
-                text = utt.get("text", "").strip()
-                parts.append(f"Speaker {label}: {text}")
-            return "\n".join(parts)
-        if status["status"] == "error":
-            raise RuntimeError(f"Transcription failed: {status['error']}")
+        data = status_resp.json()
+
+        if data["status"] == "completed":
+            utterances = data.get("utterances")
+            if utterances:
+                parts = []
+                for utt in utterances:
+                    # номер спикера +1, если это число
+                    sp = utt.get("speaker")
+                    try:
+                        label = f"Speaker {int(sp) + 1}"
+                    except:
+                        label = f"Speaker {sp}"
+                    text = utt.get("text", "").strip()
+                    parts.append(f"{label}: {text}")
+                return "\n".join(parts)
+            return data.get("text", "")
+
+        if data["status"] == "error":
+            raise RuntimeError(f"Transcription failed: {data.get('error')}")
+
         time.sleep(3)
 
 async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
