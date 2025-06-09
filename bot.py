@@ -38,7 +38,7 @@ async def request_transcript(audio_url: str) -> str:
     response.raise_for_status()
     transcript_id = response.json()["id"]
     status_url = f"{ASSEMBLYAI_TRANSCRIPT_URL}/{transcript_id}"
-   while True:
+    while True:
         status_resp = requests.get(status_url, headers=HEADERS)
         status_resp.raise_for_status()
         status = status_resp.json()
