@@ -2,7 +2,12 @@ import os
 import time
 import logging
 import tempfile
+import mimetypes
+import re
+from urllib.parse import urljoin
+
 import requests
+from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import Application, MessageHandler, ContextTypes, filters
 
@@ -13,6 +18,8 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ASSEMBLYAI_UPLOAD_URL = "https://api.assemblyai.com/v2/upload"
 ASSEMBLYAI_TRANSCRIPT_URL = "https://api.assemblyai.com/v2/transcript"
 HEADERS = {"authorization": ASSEMBLYAI_TOKEN}
+
+URL_REGEX = re.compile(r"https?://\S+")
 
 if not ASSEMBLYAI_TOKEN:
     raise RuntimeError("ASSEMBLYAI_TOKEN environment variable not set")
@@ -65,6 +72,62 @@ async def request_transcript(audio_url: str) -> str:
 
         time.sleep(3)
 
+def _audio_links_from_html(html: str, base: str) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    links: list[str] = []
+    for audio in soup.find_all("audio"):
+        src = audio.get("src")
+        if src:
+            links.append(urljoin(base, src))
+        for source in audio.find_all("source"):
+            s = source.get("src")
+            if s:
+                links.append(urljoin(base, s))
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        mime, _ = mimetypes.guess_type(href)
+        if mime and mime.startswith("audio"):
+            links.append(urljoin(base, href))
+    return list(dict.fromkeys(links))
+
+def _download_file(url: str) -> str:
+    resp = requests.get(url)
+    resp.raise_for_status()
+    ext = mimetypes.guess_extension(resp.headers.get("content-type", "")) or ""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tf:
+        tf.write(resp.content)
+        return tf.name
+
+async def handle_links(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = update.message.text or ""
+    urls = URL_REGEX.findall(text)
+    if not urls:
+        await update.message.reply_text("Please send a valid URL")
+        return
+
+    for url in urls:
+        await update.message.reply_text(f"Fetching audio from {url}…")
+        try:
+            page = await context.application.run_in_executor(None, requests.get, url)
+            page.raise_for_status()
+            html = page.text
+            final_url = page.url
+            audio_links = await context.application.run_in_executor(
+                None, _audio_links_from_html, html, final_url
+            )
+            if not audio_links:
+                await update.message.reply_text("No audio found on the page")
+                continue
+            for aurl in audio_links:
+                tmp = await context.application.run_in_executor(None, _download_file, aurl)
+                try:
+                    with open(tmp, "rb") as f:
+                        await update.message.reply_audio(f)
+                finally:
+                    os.unlink(tmp)
+        except Exception as e:
+            await update.message.reply_text(f"Failed to process {url}: {e}")
+
 async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     file = None
     if update.message.voice:
@@ -92,6 +155,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 def main() -> None:
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_audio))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_links))
     app.run_polling()
 
 if __name__ == "__main__":
