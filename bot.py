@@ -18,7 +18,15 @@ ASSEMBLYAI_TOKEN = os.getenv("ASSEMBLYAI_TOKEN")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ASSEMBLYAI_UPLOAD_URL = "https://api.assemblyai.com/v2/upload"
 ASSEMBLYAI_TRANSCRIPT_URL = "https://api.assemblyai.com/v2/transcript"
-HEADERS = {"authorization": ASSEMBLYAI_TOKEN}
+ASSEMBLYAI_HEADERS = {"authorization": ASSEMBLYAI_TOKEN}
+
+# Use a Firefox user agent for web requests to avoid 403 errors on some sites
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:115.0) "
+        "Gecko/20100101 Firefox/115.0"
+    )
+}
 
 URL_REGEX = re.compile(r"https?://\S+")
 
@@ -30,7 +38,9 @@ if not TELEGRAM_TOKEN:
 
 async def upload_audio(file_path: str) -> str:
     with open(file_path, "rb") as f:
-        response = requests.post(ASSEMBLYAI_UPLOAD_URL, headers=HEADERS, data=f)
+        response = requests.post(
+            ASSEMBLYAI_UPLOAD_URL, headers=ASSEMBLYAI_HEADERS, data=f
+        )
     response.raise_for_status()
     return response.json()["upload_url"]
 
@@ -42,13 +52,15 @@ async def request_transcript(audio_url: str) -> str:
         "speech_model": "best",
         "format_text": True,
     }
-    resp = requests.post(ASSEMBLYAI_TRANSCRIPT_URL, json=payload, headers=HEADERS)
+    resp = requests.post(
+        ASSEMBLYAI_TRANSCRIPT_URL, json=payload, headers=ASSEMBLYAI_HEADERS
+    )
     resp.raise_for_status()
     transcript_id = resp.json()["id"]
     status_url = f"{ASSEMBLYAI_TRANSCRIPT_URL}/{transcript_id}"
 
     while True:
-        status_resp = requests.get(status_url, headers=HEADERS)
+        status_resp = requests.get(status_url, headers=ASSEMBLYAI_HEADERS)
         status_resp.raise_for_status()
         data = status_resp.json()
 
@@ -92,7 +104,7 @@ def _audio_links_from_html(html: str, base: str) -> list[str]:
     return list(dict.fromkeys(links))
 
 def _download_file(url: str) -> str:
-    resp = requests.get(url)
+    resp = requests.get(url, headers=BROWSER_HEADERS)
     resp.raise_for_status()
     ext = mimetypes.guess_extension(resp.headers.get("content-type", "")) or ""
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tf:
@@ -109,7 +121,7 @@ async def handle_links(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     for url in urls:
         await update.message.reply_text(f"Fetching audio from {url}…")
         try:
-            page = await asyncio.to_thread(requests.get, url)
+            page = await asyncio.to_thread(requests.get, url, headers=BROWSER_HEADERS)
             page.raise_for_status()
             html = page.text
             final_url = page.url
