@@ -111,6 +111,14 @@ def _download_file(url: str) -> str:
         tf.write(resp.content)
         return tf.name
 
+async def _transcribe_local_file(update: Update, path: str) -> None:
+    await update.message.reply_text(
+        "Транскрибую… це може зайняти трохи часу"
+    )
+    audio_url = await upload_audio(path)
+    transcript = await request_transcript(audio_url)
+    await update.message.reply_text(transcript)
+
 async def handle_links(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text or ""
     urls = URL_REGEX.findall(text)
@@ -136,6 +144,7 @@ async def handle_links(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 try:
                     with open(tmp, "rb") as f:
                         await update.message.reply_audio(f)
+                    await _transcribe_local_file(update, tmp)
                 finally:
                     os.unlink(tmp)
         except Exception as e:
@@ -155,13 +164,8 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tf:
         await file.download_to_drive(tf.name)
-        await update.message.reply_text(
-            "Транскрибую… це може зайняти трохи часу"
-        )
         try:
-            audio_url = await upload_audio(tf.name)
-            transcript = await request_transcript(audio_url)
-            await update.message.reply_text(transcript)
+            await _transcribe_local_file(update, tf.name)
         finally:
             os.unlink(tf.name)
 
