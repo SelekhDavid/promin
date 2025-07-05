@@ -5,6 +5,7 @@ import tempfile
 import mimetypes
 import re
 from urllib.parse import urljoin
+import asyncio
 
 import requests
 from bs4 import BeautifulSoup
@@ -70,7 +71,7 @@ async def request_transcript(audio_url: str) -> str:
         if data["status"] == "error":
             raise RuntimeError(f"Transcription failed: {data.get('error')}")
 
-        time.sleep(3)
+        await asyncio.sleep(3)
 
 def _audio_links_from_html(html: str, base: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
@@ -108,18 +109,18 @@ async def handle_links(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     for url in urls:
         await update.message.reply_text(f"Fetching audio from {url}…")
         try:
-            page = await context.application.run_in_executor(None, requests.get, url)
+            page = await asyncio.to_thread(requests.get, url)
             page.raise_for_status()
             html = page.text
             final_url = page.url
-            audio_links = await context.application.run_in_executor(
-                None, _audio_links_from_html, html, final_url
+            audio_links = await asyncio.to_thread(
+                _audio_links_from_html, html, final_url
             )
             if not audio_links:
                 await update.message.reply_text("No audio found on the page")
                 continue
             for aurl in audio_links:
-                tmp = await context.application.run_in_executor(None, _download_file, aurl)
+                tmp = await asyncio.to_thread(_download_file, aurl)
                 try:
                     with open(tmp, "rb") as f:
                         await update.message.reply_audio(f)
