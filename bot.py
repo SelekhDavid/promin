@@ -6,7 +6,8 @@ import mimetypes
 import re
 from urllib.parse import urljoin
 import asyncio
-
+from dotenv import load_dotenv
+load_dotenv()
 import requests
 from bs4 import BeautifulSoup
 from telegram import Update
